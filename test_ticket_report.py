@@ -7,6 +7,7 @@ from ticket_report import load_tickets
 from ticket_report import filter_open, is_stale
 from ticket_report import group_by, summarize
 from ticket_report import format_report
+from ticket_report import ticket_age
 
 
 def test_parse_date_valid():
@@ -81,25 +82,6 @@ def test_filter_open_empty_list():
     assert filter_open([]) == []
 
 
-def test_is_stale_above_threshold():
-    assert is_stale({"days_in_phase": "42"}, 14) is True
-
-
-def test_is_stale_below_threshold():
-    assert is_stale({"days_in_phase": "5"}, 14) is False
-
-
-def test_is_stale_exactly_at_threshold():
-    assert is_stale({"days_in_phase": "14"}, 14) is True
-
-
-def test_is_stale_invalid_value():
-    assert is_stale({"days_in_phase": "n/a"}, 14) is False
-
-
-def test_is_stale_missing_column():
-    assert is_stale({"id": "T-1"}, 14) is False
-
 def test_group_by_splits_into_groups():
     tickets = [
         {"id": "T-1", "team": "Alpha"},
@@ -117,30 +99,9 @@ def test_group_by_handles_empty_values():
     assert len(groups["(leer)"]) == 2
 
 
-def test_summarize_calculates_stats():
-    tickets = [
-        {"days_in_phase": "10"},
-        {"days_in_phase": "20"},
-        {"days_in_phase": "30"},
-    ]
-    result = summarize(tickets)
-    assert result == {"count": 3, "median_days": 20, "max_days": 30}
-
-
-def test_summarize_median_with_even_count():
-    tickets = [{"days_in_phase": "10"}, {"days_in_phase": "20"}]
-    assert summarize(tickets)["median_days"] == 15
-
-
 def test_summarize_empty_list():
     assert summarize([]) == {"count": 0, "median_days": None, "max_days": None}
 
-
-def test_summarize_skips_invalid_values():
-    tickets = [{"days_in_phase": "10"}, {"days_in_phase": "n/a"}]
-    result = summarize(tickets)
-    assert result["count"] == 2
-    assert result["median_days"] == 10
 
 def test_format_report_contains_group_names():
     groups = {
@@ -179,7 +140,54 @@ def test_format_report_empty_groups():
     report = format_report({}, threshold=14, group_column="team")
     assert "Gesamt" in report
 
+
+def test_ticket_age_prefers_days_column():
+    ticket = {"days_in_phase": "42", "creation_time": "2026-01-01", "done_date": ""}
+    assert ticket_age(ticket, date(2026, 8, 30)) == 42
+
+
+def test_ticket_age_falls_back_to_dates():
+    ticket = {"days_in_phase": "", "creation_time": "2026-08-25", "done_date": ""}
+    assert ticket_age(ticket, date(2026, 8, 30)) == 5
+
+
+def test_ticket_age_fallback_uses_done_date():
+    ticket = {"days_in_phase": "n/a", "creation_time": "2026-07-15", "done_date": "2026-08-01"}
+    assert ticket_age(ticket, date(2026, 8, 30)) == 17
+
+
+def test_ticket_age_without_any_data():
+    assert ticket_age({"id": "T-1"}, date(2026, 8, 30)) is None
+
+def test_is_stale_above_threshold():
+    assert is_stale(42, 14) is True
+
+
+def test_is_stale_below_threshold():
+    assert is_stale(5, 14) is False
+
+
+def test_is_stale_exactly_at_threshold():
+    assert is_stale(14, 14) is True
+
+
+def test_is_stale_unknown_age():
+    assert is_stale(None, 14) is False
+
+
+def test_summarize_calculates_stats():
+    assert summarize([10, 20, 30]) == {"count": 3, "median_days": 20, "max_days": 30}
+
+
+def test_summarize_median_with_even_count():
+    assert summarize([10, 20])["median_days"] == 15
+
+
+def test_summarize_skips_unknown_ages():
+    result = summarize([10, None])
+    assert result["count"] == 2
+    assert result["median_days"] == 10
+
+
 def test_summarize_median_returns_int_when_whole():
-    tickets = [{"days_in_phase": "10"}, {"days_in_phase": "20"}, {"days_in_phase": "30"}]
-    assert summarize(tickets)["median_days"] == 20
-    assert isinstance(summarize(tickets)["median_days"], int)
+    assert isinstance(summarize([10, 20, 30])["median_days"], int)

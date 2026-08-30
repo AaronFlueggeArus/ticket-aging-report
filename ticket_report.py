@@ -45,17 +45,36 @@ def filter_open(tickets: list[dict], done_column: str = "done_date") -> list[dic
     """
     return [t for t in tickets if not t.get(done_column, "").strip()]
 
+def ticket_age(
+    ticket: dict,
+    today: date,
+    days_column: str = "days_in_phase",
+    created_column: str = "creation_time",
+    done_column: str = "done_date",
+) -> int | None:
+    """Ermittelt die Liegedauer eines Tickets in Tagen.
 
-def is_stale(ticket: dict, threshold: int, days_column: str = "days_in_phase") -> bool:
-    """Prueft, ob ein Ticket laenger als threshold Tage in seiner Phase haengt.
-
-    Nicht lesbare oder fehlende Werte gelten als nicht auffaellig.
+    Bevorzugt die Spalte mit der Phasendauer. Fehlt sie oder ist sie
+    nicht lesbar, wird aus Erstell- und Abschlussdatum gerechnet.
+    Gibt None zurueck, wenn beides nicht moeglich ist.
     """
     try:
-        days = int(ticket.get(days_column, "").strip())
-    except (ValueError, AttributeError):
+        return int((ticket.get(days_column) or "").strip())
+    except ValueError:
+        pass
+
+    created = parse_date(ticket.get(created_column) or "")
+    done = parse_date(ticket.get(done_column) or "")
+    return days_open(created, done, today)
+
+def is_stale(age: int | None, threshold: int) -> bool:
+    """Prueft, ob eine Liegedauer die Schwelle erreicht.
+
+    Nicht ermittelbare Dauern gelten als nicht auffaellig.
+    """
+    if age is None:
         return False
-    return days >= threshold
+    return age >= threshold
 
 def group_by(tickets: list[dict], column: str) -> dict[str, list[dict]]:
     """Gruppiert Tickets nach dem Wert einer Spalte.
@@ -68,25 +87,20 @@ def group_by(tickets: list[dict], column: str) -> dict[str, list[dict]]:
         groups.setdefault(key, []).append(ticket)
     return groups
 
+def summarize(ages: list[int | None]) -> dict:
+    """Berechnet Kennzahlen ueber eine Liste von Liegedauern.
 
-def summarize(tickets: list[dict], days_column: str = "days_in_phase") -> dict:
-    """Berechnet Kennzahlen ueber eine Menge von Tickets.
-
-    Nicht lesbare Tagewerte werden uebersprungen.
+    Nicht ermittelbare Werte fliessen nicht in Median und Max ein,
+    zaehlen aber bei count mit.
     """
-    values = []
-    for ticket in tickets:
-        try:
-            values.append(int(ticket.get(days_column, "").strip()))
-        except (ValueError, AttributeError):
-            continue
+    values = [a for a in ages if a is not None]
 
     if not values:
-        return {"count": len(tickets), "median_days": None, "max_days": None}
+        return {"count": len(ages), "median_days": None, "max_days": None}
 
     med = median(values)
     return {
-        "count": len(tickets),
+        "count": len(ages),
         "median_days": int(med) if med == int(med) else round(med, 1),
         "max_days": max(values),
     }
@@ -132,16 +146,22 @@ def build_summary(
     tickets: list[dict],
     threshold: int,
     group_column: str,
+    today: date,
     days_column: str = "days_in_phase",
+    created_column: str = "creation_time",
+    done_column: str = "done_date",
 ) -> dict[str, dict]:
     """Fasst Tickets pro Gruppe zusammen und ergaenzt die Anzahl auffaelliger."""
     result = {}
     for name, group in group_by(tickets, group_column).items():
-        stats = summarize(group, days_column)
-        stats["stale_count"] = sum(1 for t in group if is_stale(t, threshold, days_column))
+        ages = [
+            ticket_age(t, today, days_column, created_column, done_column)
+            for t in group
+        ]
+        stats = summarize(ages)
+        stats["stale_count"] = sum(1 for a in ages if is_stale(a, threshold))
         result[name] = stats
     return result
-
 
 def main() -> None:
     parser = argparse.ArgumentParser(
@@ -165,6 +185,11 @@ def main() -> None:
         help="Spalte mit der Phasendauer (Standard: days_in_phase)",
     )
     parser.add_argument(
+        "--created-column",
+        default="creation_time",
+        help="Spalte mit dem Erstelldatum (Standard: creation_time)",
+    )
+    parser.add_argument(
         "--done-column",
         default="done_date",
         help="Spalte mit dem Abschlussdatum (Standard: done_date)",
@@ -179,7 +204,13 @@ def main() -> None:
 
     open_tickets = filter_open(tickets, args.done_column)
     summary = build_summary(
-        open_tickets, args.threshold, args.group_by, args.days_column
+        open_tickets,
+        args.threshold,
+        args.group_by,
+        date.today(),
+        args.days_column,
+        args.created_column,
+        args.done_column,
     )
     print(format_report(summary, args.threshold, args.group_by))
 
