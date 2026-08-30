@@ -14,3 +14,14 @@ def parse_date(value: str) -> date | None:
         return datetime.strptime(value.strip(), "%Y-%m-%d").date()
     except ValueError:
         return None
+
+def days_open(created: date | None, done: date | None, today: date) -> int | None:
+    """Berechnet, wie viele Tage ein Ticket offen war bzw. ist.
+
+    Ist done gesetzt, zaehlt der Zeitraum bis zum Abschluss.
+    Sonst bis today. Ohne created ist keine Aussage moeglich: None.
+    """
+    if created is None:
+        return None
+    end = done if done is not None else today
+    return (end - created).days    
