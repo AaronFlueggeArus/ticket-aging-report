@@ -3,6 +3,7 @@
 from datetime import date
 from ticket_report import parse_date
 from ticket_report import days_open
+from ticket_report import load_tickets
 
 
 def test_parse_date_valid():
@@ -43,3 +44,22 @@ def test_days_open_same_day():
 
 def test_days_open_without_created():
     assert days_open(None, None, date(2026, 8, 30)) is None
+
+def test_load_tickets_reads_rows(tmp_path):
+    csv_file = tmp_path / "tickets.csv"
+    csv_file.write_text(
+        "id,phase,days_in_phase\n"
+        "T-1,Analysis,10\n"
+        "T-2,Closed,3\n",
+        encoding="utf-8",
+    )
+    tickets = load_tickets(str(csv_file))
+    assert len(tickets) == 2
+    assert tickets[0]["id"] == "T-1"
+    assert tickets[1]["days_in_phase"] == "3"
+
+
+def test_load_tickets_empty_file(tmp_path):
+    csv_file = tmp_path / "empty.csv"
+    csv_file.write_text("id,phase,days_in_phase\n", encoding="utf-8")
+    assert load_tickets(str(csv_file)) == []

@@ -1,5 +1,6 @@
 """Aging- und Eskalations-Report fuer Ticket-Exporte (CSV)."""
 
+import csv
 from datetime import date, datetime
 
 
@@ -25,3 +26,11 @@ def days_open(created: date | None, done: date | None, today: date) -> int | Non
         return None
     end = done if done is not None else today
     return (end - created).days    
+
+def load_tickets(path: str) -> list[dict]:
+    """Liest eine Ticket-CSV ein und gibt die Zeilen als Dicts zurueck.
+
+    Erwartet eine Kopfzeile mit Spaltennamen.
+    """
+    with open(path, newline="", encoding="utf-8-sig") as file:
+        return list(csv.DictReader(file))
