@@ -34,3 +34,22 @@ def load_tickets(path: str) -> list[dict]:
     """
     with open(path, newline="", encoding="utf-8-sig") as file:
         return list(csv.DictReader(file))
+
+def filter_open(tickets: list[dict], done_column: str = "done_date") -> list[dict]:
+    """Gibt nur die Tickets zurueck, die noch nicht abgeschlossen sind.
+
+    Als offen gilt ein Ticket, dessen Done-Spalte leer ist.
+    """
+    return [t for t in tickets if not t.get(done_column, "").strip()]
+
+
+def is_stale(ticket: dict, threshold: int, days_column: str = "days_in_phase") -> bool:
+    """Prueft, ob ein Ticket laenger als threshold Tage in seiner Phase haengt.
+
+    Nicht lesbare oder fehlende Werte gelten als nicht auffaellig.
+    """
+    try:
+        days = int(ticket.get(days_column, "").strip())
+    except (ValueError, AttributeError):
+        return False
+    return days >= threshold

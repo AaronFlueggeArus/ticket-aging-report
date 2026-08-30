@@ -4,6 +4,7 @@ from datetime import date
 from ticket_report import parse_date
 from ticket_report import days_open
 from ticket_report import load_tickets
+from ticket_report import filter_open, is_stale
 
 
 def test_parse_date_valid():
@@ -63,3 +64,36 @@ def test_load_tickets_empty_file(tmp_path):
     csv_file = tmp_path / "empty.csv"
     csv_file.write_text("id,phase,days_in_phase\n", encoding="utf-8")
     assert load_tickets(str(csv_file)) == []
+
+def test_filter_open_keeps_only_unfinished():
+    tickets = [
+        {"id": "T-1", "done_date": ""},
+        {"id": "T-2", "done_date": "2026-08-01"},
+        {"id": "T-3", "done_date": "   "},
+    ]
+    result = filter_open(tickets)
+    assert [t["id"] for t in result] == ["T-1", "T-3"]
+
+
+def test_filter_open_empty_list():
+    assert filter_open([]) == []
+
+
+def test_is_stale_above_threshold():
+    assert is_stale({"days_in_phase": "42"}, 14) is True
+
+
+def test_is_stale_below_threshold():
+    assert is_stale({"days_in_phase": "5"}, 14) is False
+
+
+def test_is_stale_exactly_at_threshold():
+    assert is_stale({"days_in_phase": "14"}, 14) is True
+
+
+def test_is_stale_invalid_value():
+    assert is_stale({"days_in_phase": "n/a"}, 14) is False
+
+
+def test_is_stale_missing_column():
+    assert is_stale({"id": "T-1"}, 14) is False
