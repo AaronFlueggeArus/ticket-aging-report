@@ -6,6 +6,7 @@ from ticket_report import days_open
 from ticket_report import load_tickets
 from ticket_report import filter_open, is_stale
 from ticket_report import group_by, summarize
+from ticket_report import format_report
 
 
 def test_parse_date_valid():
@@ -140,3 +141,40 @@ def test_summarize_skips_invalid_values():
     result = summarize(tickets)
     assert result["count"] == 2
     assert result["median_days"] == 10
+
+def test_format_report_contains_group_names():
+    groups = {
+        "Team Alpha": {"count": 3, "stale_count": 2, "median_days": 42, "max_days": 141},
+        "Team Beta": {"count": 2, "stale_count": 1, "median_days": 32, "max_days": 60},
+    }
+    report = format_report(groups, threshold=14, group_column="team")
+    assert "Team Alpha" in report
+    assert "Team Beta" in report
+
+
+def test_format_report_shows_threshold():
+    groups = {"A": {"count": 1, "stale_count": 0, "median_days": 5, "max_days": 5}}
+    report = format_report(groups, threshold=14, group_column="team")
+    assert "14" in report
+
+
+def test_format_report_totals():
+    groups = {
+        "A": {"count": 3, "stale_count": 2, "median_days": 10, "max_days": 20},
+        "B": {"count": 2, "stale_count": 1, "median_days": 5, "max_days": 8},
+    }
+    report = format_report(groups, threshold=14, group_column="team")
+    assert "Gesamt" in report
+    lines = report.splitlines()
+    assert lines[-1].split()[1:] == ["5", "3"]
+
+
+def test_format_report_handles_none_values():
+    groups = {"A": {"count": 2, "stale_count": 0, "median_days": None, "max_days": None}}
+    report = format_report(groups, threshold=14, group_column="team")
+    assert "-" in report
+
+
+def test_format_report_empty_groups():
+    report = format_report({}, threshold=14, group_column="team")
+    assert "Gesamt" in report

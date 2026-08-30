@@ -87,3 +87,40 @@ def summarize(tickets: list[dict], days_column: str = "days_in_phase") -> dict:
         "median_days": median(values),
         "max_days": max(values),
     }
+
+def format_report(
+    groups: dict[str, dict],
+    threshold: int,
+    group_column: str,
+) -> str:
+    """Formatiert die Auswertung als mehrzeiligen Text.
+
+    Erwartet pro Gruppe ein Dict mit den Schluesseln
+    count, stale_count, median_days und max_days.
+    """
+    lines = [
+        f"Ticket-Report (Schwelle: {threshold} Tage)",
+        f"Gruppiert nach: {group_column}",
+        "",
+        f"{'Gruppe':<25}{'Offen':>8}{'Auffaellig':>12}{'Median':>9}{'Max':>7}",
+        "-" * 61,
+    ]
+
+    for name in sorted(groups):
+        data = groups[name]
+        median_text = "-" if data["median_days"] is None else str(data["median_days"])
+        max_text = "-" if data["max_days"] is None else str(data["max_days"])
+        lines.append(
+            f"{name[:24]:<25}"
+            f"{data['count']:>8}"
+            f"{data['stale_count']:>12}"
+            f"{median_text:>9}"
+            f"{max_text:>7}"
+        )
+
+    total = sum(g["count"] for g in groups.values())
+    total_stale = sum(g["stale_count"] for g in groups.values())
+    lines.append("-" * 61)
+    lines.append(f"{'Gesamt':<25}{total:>8}{total_stale:>12}")
+
+    return "\n".join(lines)
