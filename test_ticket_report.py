@@ -178,3 +178,8 @@ def test_format_report_handles_none_values():
 def test_format_report_empty_groups():
     report = format_report({}, threshold=14, group_column="team")
     assert "Gesamt" in report
+
+def test_summarize_median_returns_int_when_whole():
+    tickets = [{"days_in_phase": "10"}, {"days_in_phase": "20"}, {"days_in_phase": "30"}]
+    assert summarize(tickets)["median_days"] == 20
+    assert isinstance(summarize(tickets)["median_days"], int)

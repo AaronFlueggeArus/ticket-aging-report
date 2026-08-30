@@ -1,6 +1,8 @@
 """Aging- und Eskalations-Report fuer Ticket-Exporte (CSV)."""
 
+import argparse
 import csv
+import sys
 from datetime import date, datetime
 from statistics import median
 
@@ -82,9 +84,10 @@ def summarize(tickets: list[dict], days_column: str = "days_in_phase") -> dict:
     if not values:
         return {"count": len(tickets), "median_days": None, "max_days": None}
 
+    med = median(values)
     return {
         "count": len(tickets),
-        "median_days": median(values),
+        "median_days": int(med) if med == int(med) else round(med, 1),
         "max_days": max(values),
     }
 
@@ -124,3 +127,62 @@ def format_report(
     lines.append(f"{'Gesamt':<25}{total:>8}{total_stale:>12}")
 
     return "\n".join(lines)
+
+def build_summary(
+    tickets: list[dict],
+    threshold: int,
+    group_column: str,
+    days_column: str = "days_in_phase",
+) -> dict[str, dict]:
+    """Fasst Tickets pro Gruppe zusammen und ergaenzt die Anzahl auffaelliger."""
+    result = {}
+    for name, group in group_by(tickets, group_column).items():
+        stats = summarize(group, days_column)
+        stats["stale_count"] = sum(1 for t in group if is_stale(t, threshold, days_column))
+        result[name] = stats
+    return result
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Aging-Report ueber einen Ticket-Export (CSV)."
+    )
+    parser.add_argument("csv_file", help="Pfad zur CSV-Datei")
+    parser.add_argument(
+        "--threshold",
+        type=int,
+        default=14,
+        help="Ab wie vielen Tagen in der Phase ein Ticket auffaellig ist (Standard: 14)",
+    )
+    parser.add_argument(
+        "--group-by",
+        default="solution_responsible",
+        help="Spalte, nach der gruppiert wird (Standard: solution_responsible)",
+    )
+    parser.add_argument(
+        "--days-column",
+        default="days_in_phase",
+        help="Spalte mit der Phasendauer (Standard: days_in_phase)",
+    )
+    parser.add_argument(
+        "--done-column",
+        default="done_date",
+        help="Spalte mit dem Abschlussdatum (Standard: done_date)",
+    )
+    args = parser.parse_args()
+
+    try:
+        tickets = load_tickets(args.csv_file)
+    except FileNotFoundError:
+        print(f"Datei nicht gefunden: {args.csv_file}", file=sys.stderr)
+        sys.exit(1)
+
+    open_tickets = filter_open(tickets, args.done_column)
+    summary = build_summary(
+        open_tickets, args.threshold, args.group_by, args.days_column
+    )
+    print(format_report(summary, args.threshold, args.group_by))
+
+
+if __name__ == "__main__":
+    main()
