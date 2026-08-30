@@ -1,0 +1,9 @@
+id,creation_time,done_date,phase,substatus,days_in_phase,solution_responsible,defect_severity,prio_systemstability
+T-1001,2026-06-02,,Analysis,In Progress,42,Team Alpha,High,1
+T-1002,2026-07-15,2026-08-01,Closed,Done,17,Team Beta,Medium,3
+T-1003,2026-05-20,,Implementation,Blocked,89,Team Alpha,Critical,1
+T-1004,2026-08-10,,Analysis,In Progress,20,Team Gamma,Low,4
+T-1005,2026-08-25,,Verification,In Progress,5,Team Beta,High,2
+T-1006,2026-04-11,,Implementation,Blocked,141,Team Alpha,Critical,1
+T-1007,2026-08-20,2026-08-28,Closed,Done,8,Team Gamma,Medium,3
+T-1008,2026-07-01,,Analysis,In Progress,60,Team Beta,Low,4
