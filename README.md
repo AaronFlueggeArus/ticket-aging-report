@@ -46,6 +46,7 @@ python ticket_report.py <csv-datei> [OPTIONEN]
 | `--threshold` | `14` | Ab wie vielen Tagen in der Phase ein Ticket als auffällig gilt |
 | `--group-by` | `solution_responsible` | Spalte, nach der gruppiert wird |
 | `--days-column` | `days_in_phase` | Spalte mit der Phasendauer |
+| `--created-column` | `creation_time` | Spalte mit dem Erstelldatum (Fallback, wenn Phasendauer fehlt) |
 | `--done-column` | `done_date` | Spalte mit dem Abschlussdatum; leer = offen |
 
 Die Spaltennamen sind konfigurierbar, damit das Tool mit Exporten aus
@@ -61,6 +62,10 @@ id,creation_time,done_date,phase,substatus,days_in_phase,solution_responsible,de
 T-1001,2026-06-02,,Analysis,In Progress,42,Team Alpha,High,1
 ```
 
+Fehlt die Spalte mit der Phasendauer oder ist sie nicht lesbar, wird die
+Liegedauer aus Erstell- und Abschlussdatum berechnet. Datumsangaben werden
+im ISO-Format erwartet (`YYYY-MM-DD`).
+
 Alle Beispieldaten sind erfunden.
 
 ## Tests
@@ -69,7 +74,7 @@ Alle Beispieldaten sind erfunden.
 pytest -v
 ```
 
-31 Tests decken die Logik ab, inklusive Randfälle: leere Datumsfelder,
+Die Testsuite deckt die Logik ab, inklusive Randfälle: leere Datumsfelder,
 nicht-numerische Werte, Median bei gerader Anzahl, Schwellwert-Grenze.
 
 ## Aufbau
@@ -79,11 +84,19 @@ sie nehmen Werte entgegen und geben Werte zurück. Ein- und Ausgabe sind
 auf `main()` beschränkt. Dadurch ist die Logik vollständig testbar,
 ohne Dateien oder Mocking.
 
+Auch das aktuelle Datum wird als Parameter durchgereicht statt intern
+abgefragt. Nur `main()` kennt `date.today()` – so bleiben die
+Berechnungen deterministisch und die Tests unabhängig vom Kalender.
+
+Das Tool kommt ohne externe Laufzeit-Abhängigkeiten aus – nur
+Standardbibliothek. `pytest` wird ausschließlich für die Tests benötigt.
+
 | Funktion | Aufgabe |
 |---|---|
 | `load_tickets` | CSV einlesen |
 | `parse_date` | Datumsstring parsen, `None` bei ungültig |
-| `days_open` | Liegedauer berechnen |
+| `days_open` | Liegedauer aus zwei Daten berechnen |
+| `ticket_age` | Liegedauer ermitteln, mit Fallback auf die Datumsspalten |
 | `filter_open` | Nur nicht abgeschlossene Tickets |
 | `is_stale` | Schwellwert-Prüfung |
 | `group_by` | Gruppierung nach Spalte |
