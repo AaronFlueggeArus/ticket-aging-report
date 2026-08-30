@@ -2,6 +2,7 @@
 
 import csv
 from datetime import date, datetime
+from statistics import median
 
 
 def parse_date(value: str) -> date | None:
@@ -53,3 +54,36 @@ def is_stale(ticket: dict, threshold: int, days_column: str = "days_in_phase") -
     except (ValueError, AttributeError):
         return False
     return days >= threshold
+
+def group_by(tickets: list[dict], column: str) -> dict[str, list[dict]]:
+    """Gruppiert Tickets nach dem Wert einer Spalte.
+
+    Leere oder fehlende Werte landen unter "(leer)".
+    """
+    groups: dict[str, list[dict]] = {}
+    for ticket in tickets:
+        key = ticket.get(column, "").strip() or "(leer)"
+        groups.setdefault(key, []).append(ticket)
+    return groups
+
+
+def summarize(tickets: list[dict], days_column: str = "days_in_phase") -> dict:
+    """Berechnet Kennzahlen ueber eine Menge von Tickets.
+
+    Nicht lesbare Tagewerte werden uebersprungen.
+    """
+    values = []
+    for ticket in tickets:
+        try:
+            values.append(int(ticket.get(days_column, "").strip()))
+        except (ValueError, AttributeError):
+            continue
+
+    if not values:
+        return {"count": len(tickets), "median_days": None, "max_days": None}
+
+    return {
+        "count": len(tickets),
+        "median_days": median(values),
+        "max_days": max(values),
+    }

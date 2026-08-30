@@ -5,6 +5,7 @@ from ticket_report import parse_date
 from ticket_report import days_open
 from ticket_report import load_tickets
 from ticket_report import filter_open, is_stale
+from ticket_report import group_by, summarize
 
 
 def test_parse_date_valid():
@@ -97,3 +98,45 @@ def test_is_stale_invalid_value():
 
 def test_is_stale_missing_column():
     assert is_stale({"id": "T-1"}, 14) is False
+
+def test_group_by_splits_into_groups():
+    tickets = [
+        {"id": "T-1", "team": "Alpha"},
+        {"id": "T-2", "team": "Beta"},
+        {"id": "T-3", "team": "Alpha"},
+    ]
+    groups = group_by(tickets, "team")
+    assert set(groups.keys()) == {"Alpha", "Beta"}
+    assert len(groups["Alpha"]) == 2
+
+
+def test_group_by_handles_empty_values():
+    tickets = [{"id": "T-1", "team": ""}, {"id": "T-2"}]
+    groups = group_by(tickets, "team")
+    assert len(groups["(leer)"]) == 2
+
+
+def test_summarize_calculates_stats():
+    tickets = [
+        {"days_in_phase": "10"},
+        {"days_in_phase": "20"},
+        {"days_in_phase": "30"},
+    ]
+    result = summarize(tickets)
+    assert result == {"count": 3, "median_days": 20, "max_days": 30}
+
+
+def test_summarize_median_with_even_count():
+    tickets = [{"days_in_phase": "10"}, {"days_in_phase": "20"}]
+    assert summarize(tickets)["median_days"] == 15
+
+
+def test_summarize_empty_list():
+    assert summarize([]) == {"count": 0, "median_days": None, "max_days": None}
+
+
+def test_summarize_skips_invalid_values():
+    tickets = [{"days_in_phase": "10"}, {"days_in_phase": "n/a"}]
+    result = summarize(tickets)
+    assert result["count"] == 2
+    assert result["median_days"] == 10
